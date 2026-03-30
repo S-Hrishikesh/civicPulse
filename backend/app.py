@@ -58,7 +58,11 @@ def token_required(f):
         try:
             current_user = auth.verify_id_token(token)
         except Exception as e:
-            return jsonify({"message": str(e)}), 401
+            err_msg = str(e)
+            if firebase_init_error:
+                err_msg += f" | INIT_ERROR: {firebase_init_error}"
+            print("Token verification failed:", err_msg)
+            return jsonify({"message": "Invalid token", "error": err_msg}), 401
         
         return f(current_user, *args, **kwargs)
     return decorated
@@ -66,6 +70,14 @@ def token_required(f):
 # ==========================================
 # ROUTES
 # ==========================================
+
+@app.route('/api/debug', methods=['GET'])
+def debug_env():
+    return jsonify({
+        "firebase_init_error": firebase_init_error,
+        "has_credentials": "FIREBASE_CREDENTIALS" in os.environ,
+        "cred_preview": os.environ.get("FIREBASE_CREDENTIALS", "")[:25]
+    })
 
 @app.route('/api/auth/sync', methods=['POST'])
 @token_required
