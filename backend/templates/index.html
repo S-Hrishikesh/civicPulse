@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicPulse | Hyperlocal Grievance Redressal</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #1e3a8a; 
+            --secondary: #3b82f6; 
+            --bg-color: #f3f4f6;
+            --sidebar-bg: #111827;
+            --text-dark: #1f2937;
+            --text-light: #9ca3af;
+        }
+
+        body {
+            margin: 0; font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            display: flex; height: 100vh; overflow: hidden;
+        }
+
+        /* --- AUTHENTICATION OVERLAY --- */
+        #auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex; justify-content: center; align-items: center; z-index: 9999;
+        }
+        .auth-card {
+            background: white; padding: 40px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; text-align: center;
+        }
+        .auth-card h2 { color: var(--primary); margin-bottom: 5px; }
+        .auth-card p { color: var(--text-light); margin-bottom: 25px; font-size: 14px; }
+        .auth-input {
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;
+        }
+        .btn {
+            width: 100%; padding: 12px; background: var(--secondary); color: white;
+            border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s;
+        }
+        .btn:hover { background: var(--primary); }
+
+        /* --- MAIN APP LAYOUT --- */
+        #app-container { display: none; width: 100%; height: 100%; }
+
+        /* SIDEBAR */
+        .sidebar { width: 250px; background-color: var(--sidebar-bg); color: white; display: flex; flex-direction: column; }
+        .logo-area { padding: 20px; font-size: 24px; font-weight: 700; border-bottom: 1px solid #374151; display: flex; align-items: center; gap: 10px; }
+        .logo-area i { color: var(--secondary); }
+        .nav-links { list-style: none; padding: 0; margin: 20px 0; }
+        .nav-links li { padding: 15px 20px; cursor: pointer; transition: 0.2s; color: #d1d5db; }
+        .nav-links li:hover, .nav-links li.active { background-color: #1f2937; border-left: 4px solid var(--secondary); color: white; }
+        .nav-links i { width: 25px; }
+
+        /* MAIN CONTENT AREA */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .navbar { height: 70px; background: white; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .user-profile { display: flex; align-items: center; gap: 15px; font-weight: 600;}
+        .logout-btn { background: #ef4444; padding: 8px 15px; width: auto; }
+        
+        /* DASHBOARD VIEWS */
+        .dashboard { padding: 40px; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        .form-card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 600px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-dark); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box;}
+        
+        /* TABLE STYLING */
+        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .data-table th, .data-table td { padding: 15px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .data-table th { background-color: var(--primary); color: white; font-weight: 600; }
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-open { background: #fef08a; color: #854d0e; }
+        .status-resolved { background: #bbf7d0; color: #166534; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <div class="auth-card" id="login-step">
+            <h2><i class="fa-solid fa-building-columns"></i> CivicPulse</h2>
+            <p>Citizen Portal Login</p>
+            <input type="email" id="email" class="auth-input" placeholder="Email Address">
+            <input type="password" id="password" class="auth-input" placeholder="Password">
+            <button class="btn" id="login-btn" onclick="simulateLogin()">Sign In</button>
+        </div>
+    </div>
+
+    <div id="app-container">
+        <div class="sidebar">
+            <div class="logo-area"><i class="fa-solid fa-map-location-dot"></i> CivicPulse</div>
+            <ul class="nav-links">
+                <li id="nav-form" class="active" onclick="switchView('form-view', 'nav-form')"><i class="fa-solid fa-pen-to-square"></i> Lodge Grievance</li>
+                <li id="nav-table" onclick="switchView('table-view', 'nav-table')"><i class="fa-solid fa-table-list"></i> My Complaints</li>
+                <li><i class="fa-solid fa-chart-pie"></i> Ward Analytics</li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <div class="navbar">
+                <h3 style="margin:0; color: var(--text-dark);">Citizen Dashboard</h3>
+                <div class="user-profile">
+                    <span id="display-user">Verified Citizen</span>
+                    <button class="btn logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <div class="dashboard">
+                
+                <div id="form-view" class="view-section active">
+                    <div class="form-card">
+                        <h2 style="margin-top:0; color: var(--primary);">Report an Issue</h2>
+                        <form id="complaintForm" onsubmit="submitSecureGrievance(event)">
+                            <div class="form-group">
+                                <label>Complaint ID (Auto/Demo):</label>
+                                <input type="number" name="complaint_id" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Issue Category:</label>
+                                <select name="category_id" required>
+                                    <option value="1">Sanitation</option>
+                                    <option value="2">Electrical</option>
+                                    <option value="3">Roads</option>
+                                    <option value="4">Water Supply</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Ward Location:</label>
+                                <select name="ward_id" required>
+                                    <option value="101">Adyar South (101)</option>
+                                    <option value="102">T-Nagar Central (102)</option>
+                                    <option value="103">Guindy West (103)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>GPS Coordinates:</label>
+                                <input type="text" name="gps_location" placeholder="e.g. 12.97, 80.24">
+                            </div>
+                            <div class="form-group">
+                                <label>Description:</label>
+                                <textarea name="description" rows="4" required></textarea>
+                            </div>
+                            <button type="submit" class="btn">Submit to Authority</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="table-view" class="view-section">
+                    <h2 style="margin-top:0; color: var(--primary);">Active Grievances</h2>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in complaints %}
+                            <tr>
+                                <td>#{{ c.complaint_id }}</td>
+                                <td>Cat: {{ c.category_id }}</td>
+                                <td>{{ c.description }}</td>
+                                <td>
+                                    <span class="status-badge {% if c.status == 'Resolved' %}status-resolved{% else %}status-open{% endif %}">
+                                        {{ c.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" style="text-align:center; color: #6b7280;">No complaints found in database.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================
+           UI NAVIGATION LOGIC
+           ========================================= */
+        function switchView(viewId, navId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-links li').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(viewId).classList.add('active');
+            document.getElementById(navId).classList.add('active');
+        }
+
+        /* =========================================
+           MOCK AUTHENTICATION FLOW
+           ========================================= */
+        function simulateLogin() {
+            const email = document.getElementById('email').value;
+            const loginBtn = document.getElementById('login-btn');
+
+            if(email.includes('@')) {
+                // Show a quick loading spinner
+                loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
+                
+                setTimeout(() => {
+                    document.getElementById('auth-overlay').style.display = 'none';
+                    document.getElementById('app-container').style.display = 'flex';
+                    // Reset button text for when they log out
+                    loginBtn.innerHTML = 'Sign In';
+                }, 800); // 800ms delay for realism
+            } else {
+                alert("Please enter a valid email address.");
+            }
+        }
+
+        function logout() {
+            document.getElementById('app-container').style.display = 'none';
+            document.getElementById('auth-overlay').style.display = 'flex';
+            // Clear the inputs
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        /* =========================================
+           SECURE SUBMISSION TO FLASK (JWT FETCH)
+           ========================================= */
+        async function submitSecureGrievance(event) {
+            event.preventDefault(); 
+            
+            const formData = {
+                complaint_id: document.querySelector('input[name="complaint_id"]').value,
+                category_id: document.querySelector('select[name="category_id"]').value,
+                ward_id: document.querySelector('select[name="ward_id"]').value,
+                description: document.querySelector('textarea[name="description"]').value,
+                gps_location: document.querySelector('input[name="gps_location"]').value
+            };
+
+            try {
+                const response = await fetch('/submit_complaint', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    alert("Grievance lodged securely!");
+                    window.location.reload(); 
+                } else {
+                    const errorMsg = await response.json();
+                    // THIS WILL NOW SHOW THE REAL PYTHON/DATABASE ERROR!
+                    alert("Real Database Error: " + errorMsg.error); 
+                }
+            } catch (error) {
+                alert("Network error. Is your Flask server running?");
+            }
+        }
+    </script>
+</body>
+</html>
