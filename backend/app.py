@@ -28,12 +28,15 @@ import json
 try:
     firebase_creds = os.environ.get("FIREBASE_CREDENTIALS")
     if firebase_creds:
-        cred = credentials.Certificate(json.loads(firebase_creds))
+        cred_dict = json.loads(firebase_creds)
+        if "private_key" in cred_dict:
+            cred_dict["private_key"] = cred_dict["private_key"].replace('\\n', '\n')
+        cred = credentials.Certificate(cred_dict)
     else:
         cred = credentials.Certificate('firebase-key.json')
     firebase_admin.initialize_app(cred)
 except Exception as e:
-    print("Firebase init error:", e)
+    print("FATAL FIREBASE INIT ERROR:", e)
 
 # ==========================================
 # AUTH MIDDLEWARE
