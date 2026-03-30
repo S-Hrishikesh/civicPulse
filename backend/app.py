@@ -25,6 +25,7 @@ def get_db_connection():
 import os
 import json
 
+firebase_init_error = None
 try:
     firebase_creds = os.environ.get("FIREBASE_CREDENTIALS")
     if firebase_creds:
@@ -36,6 +37,7 @@ try:
         cred = credentials.Certificate('firebase-key.json')
     firebase_admin.initialize_app(cred)
 except Exception as e:
+    firebase_init_error = str(e)
     print("FATAL FIREBASE INIT ERROR:", e)
 
 # ==========================================
